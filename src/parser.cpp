@@ -6,7 +6,7 @@
 
 using namespace std;
 
-vector<vector<string>> parseAssembly(const string& filename, unordered_map<string, int>& labelTable) {
+vector<vector<string>> parseAssembly(const string& filename, unordered_map<string, int>& labelTable, unordered_map<int, string>& dataMemory) {
     ifstream file(filename);
     vector<vector<string>> instructions;
     string line;
@@ -51,14 +51,91 @@ vector<vector<string>> parseAssembly(const string& filename, unordered_map<strin
                 tokens.erase(tokens.begin()); //Remove the label from the tokens
             }
 
-            //instruction
-            if (!tokens.empty()) {
-                instructions.push_back(tokens);
-                *current_address += 4;  // Increment address ONLY for actual instructions
+            //data section
+            if(*current_address >= 0x10000000) {
+                if (tokens.empty()) continue;
+
+                string directive = tokens[0];
+
+                if (directive == ".word") {
+                    for (size_t i = 1; i < tokens.size(); i++) {
+                        dataMemory[*current_address] = tokens[i];
+                        *current_address += 4; //4 bytes ahead
+                    }
+                } 
+                else if (directive == ".half") {
+                    for (size_t i = 1; i < tokens.size(); i++) {
+                        dataMemory[*current_address] = tokens[i];
+                        *current_address += 2; //2 bytes ahead
+                    }
+                } 
+                else if (directive == ".byte") {
+                    for (size_t i = 1; i < tokens.size(); i++) {
+                        dataMemory[*current_address] = tokens[i];
+                        *current_address += 1; //1 byte ahead
+                    }
+                } 
+                else if (directive == ".asciiz") {
+                    string asciiString = line.substr(line.find('"') + 1); // Extract string after "
+                    asciiString = asciiString.substr(0, asciiString.rfind('"')); // Remove ending "
+
+                    for (char ch : asciiString) {
+                        dataMemory[*current_address] = to_string(ch); //each char as byte
+                        *current_address += 1;
+                    }
+                    dataMemory[*current_address] = "0"; // Store null terminator
+                    *current_address += 1;
+                }
+            }
+            else{
+                //instruction
+                if (!tokens.empty()) {
+                    instructions.push_back(tokens);
+                    *current_address += 4;  // Increment address ONLY for actual instructions
+                }
             }
         }
     }
 
     file.close();
     return instructions;
+}
+
+void replaceLabels(vector<vector<string>>& instructions, unordered_map<string, int>& labelTable) {
+    int pc = 0x00000000;
+
+    for (auto& instruction : instructions) {
+        if (instruction.size() >= 2) {
+            string& opcode = instruction[0];  // instruction type
+
+            // Handling branch instructions (beq, bne, blt, bge)
+            if ((opcode == "beq") || (opcode == "bne") || (opcode == "blt") || (opcode == "bge")) {
+                string label = instruction[3];  //label is at index 3
+
+                if (labelTable.find(label) != labelTable.end()) {
+                    int targetAddress = labelTable[label];  // Get label address
+                    int offset = (targetAddress - (pc + 4)) / 4;  // "offset in words"
+
+                    instruction[3] = to_string(offset);  // Replace label with offset
+                } else {
+                    cerr << "Error: Undefined label '" << label << "' used in " << opcode << " instruction." << endl;
+                }
+            }
+
+            // Handling jump instructions (jal)
+            else if (opcode == "jal") {
+                string label = instruction[2];  //label is at index 2 (jal x1, target)
+
+                if (labelTable.find(label) != labelTable.end()) {
+                    int targetAddress = labelTable[label];  // Get label address
+                    int offset = (targetAddress - (pc + 4));  //"offset in bytes" (UJ-type uses full offset)
+
+                    instruction[2] = to_string(offset);  // Replace label with offset
+                } else {
+                    cerr << "Error: Undefined label '" << label << "' used in jal instruction." << endl;
+                }
+            }
+        }
+        pc += 4;  // Move to the next instruction
+    }
 }
