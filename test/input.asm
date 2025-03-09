@@ -1,9 +1,10 @@
 .data
 word1: .word 5
 word2: .word 10, 15, 20
+.word 10
 half1: .half 3
 string1: .asciiz "Hello"
-byte1: .byte 255
+.byte 255
 
 .text
 main:
@@ -11,6 +12,7 @@ main:
     beq x1, x2, target
     lw x5, 16(x6)
     jal x0, target
+    jalr x0, x3, target  # This should replace `target` with its absolute address
     addi x1, x0, 3
 target:
     addi x4, x5, 10

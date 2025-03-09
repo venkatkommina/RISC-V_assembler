@@ -29,6 +29,7 @@ vector<vector<string>> parseAssembly(const string& filename, unordered_map<strin
         string word;
 
         while (ss >> word) {
+            if (word[0] == '#') break;
             word.erase(remove(word.begin(), word.end(), ','), word.end()); // Remove commas
             tokens.push_back(word);
         }
@@ -114,7 +115,7 @@ void replaceLabels(vector<vector<string>>& instructions, unordered_map<string, i
 
                 if (labelTable.find(label) != labelTable.end()) {
                     int targetAddress = labelTable[label];  // Get label address
-                    int offset = (targetAddress - (pc + 4)) / 4;  // "offset in words"
+                    int offset = (targetAddress - pc);  // "offset"
 
                     instruction[3] = to_string(offset);  // Replace label with offset
                 } else {
@@ -128,11 +129,18 @@ void replaceLabels(vector<vector<string>>& instructions, unordered_map<string, i
 
                 if (labelTable.find(label) != labelTable.end()) {
                     int targetAddress = labelTable[label];  // Get label address
-                    int offset = (targetAddress - (pc + 4));  //"offset in bytes" (UJ-type uses full offset)
+                    int offset = (targetAddress - pc);  //"offset"
 
                     instruction[2] = to_string(offset);  // Replace label with offset
                 } else {
                     cerr << "Error: Undefined label '" << label << "' used in jal instruction." << endl;
+                }
+            }
+
+            else if (opcode == "jalr") {
+                string& immediate = instruction[3];  
+                if (labelTable.find(immediate) != labelTable.end()) {
+                    instruction[3] = to_string(labelTable[immediate]);  // Replace label with actual address
                 }
             }
         }
