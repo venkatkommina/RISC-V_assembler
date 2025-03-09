@@ -9,8 +9,8 @@ string1: .asciiz "Hello"
 .text
 main:
     add x1, x2, x3
+    andi x5, x6, 10
     beq x1, x2, target
-    lw x5, 16(x6)
     jal x0, target
     jalr x0, x3, target  # This should replace `target` with its absolute address
     addi x1, x0, 3
